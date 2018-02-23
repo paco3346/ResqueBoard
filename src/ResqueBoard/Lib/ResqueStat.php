@@ -239,12 +239,15 @@ class ResqueStat
 
             Service::Mongo()
                 ->selectCollection(Service::$settings['Mongo']['database'], 'map_reduce_stats')
-                ->save(
-                    array(
-                        '_id' => 'queue_stats',
-                        'date' => $now,
-                        'stats' => $results
-                    )
+                ->updateOne(
+                    ['_id' => 'queue_stats'],
+                    [
+                        '$set' => [
+                            'date' => $now,
+                            'stats' => $results
+                        ]
+                    ],
+                    ['upsert' => true]
                 );
 
             // Format results for the API
@@ -408,17 +411,18 @@ class ResqueStat
             $conditions['t']['$lte'] = new \MongoDate($options['date_before']);
         }
 
-        $jobsCursor = $jobsCollection->find($conditions);
-        $jobsCursor->sort($options['sort']);
+        $cursorOptions = ['sort' => $options['sort']];
 
         if (!empty($options['page']) && !empty($options['limit'])) {
-            $jobsCursor->skip(($options['page']-1) * $options['limit'])->limit($options['limit']);
+            $cursorOptions['skip'] = ($options['page']-1) * $options['limit'];
+            $cursorOptions['limit'] = $options['limit'];
         }
 
         if ($options['type'] == 'count') {
-            return $jobsCursor->count();
+            return $jobsCollection->count($conditions, $cursorOptions);
         }
 
+        $jobsCursor = $jobsCollection->find($conditions, $cursorOptions);
         $results = $this->formatJobs($jobsCursor);
         if ($options['format']) {
             return $this->setJobStatus($results);
@@ -634,16 +638,18 @@ class ResqueStat
 
         $jobsCollection = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], $options['event_type'] . '_events');
 
-        $jobsCursor = $jobsCollection->find($conditions);
-        $jobsCursor->sort($options['sort']);
+        $cursorOptions = ['sort' => $options['sort']];
 
         if (!empty($options['page']) && !empty($options['limit'])) {
-            $jobsCursor->skip(($options['page']-1) * $options['limit'])->limit($options['limit']);
+            $cursorOptions['skip'] = ($options['page']-1) * $options['limit'];
+            $cursorOptions['limit'] = $options['limit'];
         }
 
         if ($options['type'] == 'count') {
-            return $jobsCursor->count();
+            return $jobsCollection->count($conditions, $cursorOptions);
         }
+
+        $jobsCursor = $jobsCollection->find($conditions, $cursorOptions);
 
         foreach ($jobsCursor as $cursor) {
             $temp = array();
@@ -720,27 +726,27 @@ class ResqueStat
      */
     public function getJobsRepartionStats($limit = 10)
     {
-        $mapReduceStats = new \MongoCollection(Service::Mongo()->selectDB(Service::$settings['Mongo']['database']), 'map_reduce_stats');
-        $startDate = $mapReduceStats->findOne(array('_id' => 'job_stats'), array('date'));
+        $collection = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'map_reduce_stats');
+        $startDate = $collection->findOne(array('_id' => 'job_stats'), array('date'));
         if (!isset($startDate['date']) || empty($startDate['date'])) {
             $startDate = null;
         } else {
             $startDate = $startDate['date'];
         }
 
-        $stopDate = new \MongoDate();
+        $stopDate = new \MongoDB\BSON\UTCDateTime();
 
-        $mapReduceStats->update(
-            array('_id' => 'job_stats'),
-            array('$set' => array('date' => $stopDate)),
-            array('upsert' => true)
+        $collection->updateOne(
+            ['_id' => 'job_stats'],
+            ['$set' => ['date' => $stopDate]],
+            ['upsert' => true]
         );
 
         $stats = new \stdClass();
 
         // Computing total jobs distribution stats
-        $map = new \MongoCode("function() {emit(this.d.args.payload.class, 1); }");
-        $reduce = new \MongoCode(
+        $map = new \MongoDB\BSON\Javascript("function() {emit(this.d.args.payload.class, 1); }");
+        $reduce = new \MongoDB\BSON\Javascript(
             "function(key, val) {".
             "var sum = 0;".
             "for (var i in val) {".
@@ -754,19 +760,24 @@ class ResqueStat
         if ($startDate != null) {
             $conditions['$gte'] = $startDate;
         }
-        Service::Mongo()->selectDB(Service::$settings['Mongo']['database'])->command(
-            array(
+        Service::Mongo()->selectDatabase(Service::$settings['Mongo']['database'])->command(
+            [
                 'mapreduce' => 'got_events',
                 'map' => $map,
                 'reduce' => $reduce,
-                'query' => array('t' => $conditions),
-                'out' => array('merge' => 'jobs_repartition_stats')
-            )
+                'query' => ['t' => $conditions],
+                'out' => ['merge' => 'jobs_repartition_stats']
+            ]
         );
 
-        $cursor = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'jobs_repartition_stats')->find()->sort(array('value' => -1))->limit($limit);
+        $cursor = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'jobs_repartition_stats')->find([], [
+            'sort' => [
+                'value' => -1
+            ],
+            'limit' => intval($limit)
+        ]);
 
-        $stats->total = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->find()->count();
+        $stats->total = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->count();
         $stats->stats = array();
         foreach ($cursor as $c) {
             $c['percentage'] = round($c['value'] / $stats->total * 100, 2);
@@ -802,15 +813,15 @@ class ResqueStat
         $stats = new \stdClass();
 
         if (in_array('total', $options['fields'])) {
-            $stats->total = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->find($filter)->count();
+            $stats->total = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->count($filter);
         }
 
         if (in_array(self::JOB_STATUS_COMPLETE, $options['fields'])) {
-            $stats->count[self::JOB_STATUS_COMPLETE] = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'done_events')->find($filter)->count();
+            $stats->count[self::JOB_STATUS_COMPLETE] = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'done_events')->count($filter);
         }
 
         if (in_array(self::JOB_STATUS_FAILED, $options['fields'])) {
-            $stats->count[self::JOB_STATUS_FAILED] = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'fail_events')->find($filter)->count();
+            $stats->count[self::JOB_STATUS_FAILED] = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'fail_events')->count($filter);
             $stats->perc[self::JOB_STATUS_FAILED] =
                 ($stats->total == 0)
                     ? 0
@@ -820,7 +831,7 @@ class ResqueStat
         $stats->count[self::JOB_STATUS_WAITING] = 0;
 
         if (in_array(self::JOB_STATUS_SCHEDULED, $options['fields'])) {
-            $stats->count[self::JOB_STATUS_SCHEDULED] = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'movescheduled_events')->find($filter)->count();
+            $stats->count[self::JOB_STATUS_SCHEDULED] = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'movescheduled_events')->count($filter);
             $stats->perc[self::JOB_STATUS_SCHEDULED] =
                 ($stats->total == 0)
                     ? 0
@@ -842,14 +853,14 @@ class ResqueStat
         $stats->newest = null;
 
         if (in_array('oldest', $options['fields'])) {
-            $cursors = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->find(array(), array('t'))->sort(array('t' => 1))->limit(1);
+            $cursors = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->find([], ['t'], ['sort' => ['t' => 1], 'limit' => 1]);
             foreach ($cursors as $cursor) {
                 $stats->oldest = new \DateTime('@'.$cursor['t']->sec);
             }
         }
 
         if (in_array('newest', $options['fields'])) {
-            $cursors = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->find(array(), array('t'))->sort(array('t' => -1))->limit(1);
+            $cursors = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->find([], ['t'], ['sort' => ['t' => -1], 'limit' => 1]);
             foreach ($cursors as $cursor) {
                 $stats->newest = new \DateTime('@'.$cursor['t']->sec);
             }
