@@ -102,7 +102,7 @@
 								} else {
 									echo '#';
 								}
-							?>">&larr; Older</a>
+							?>">&larr; Newer</a>
 						</li>
 						<li>
 							Page <?php echo $pagination->current?> of <?php echo number_format($pagination->totalPage) ?>, found <?php echo number_format($pagination->totalResult) ?> jobs
@@ -116,7 +116,7 @@
 								} else {
 									echo '#';
 								}
-							?>">Newer &rarr;</a>
+							?>">Older &rarr;</a>
 						</li>
 						</ul>
 

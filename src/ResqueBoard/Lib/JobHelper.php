@@ -92,7 +92,7 @@ class JobHelper
                             <?php if (isset($job['output'])): ?>
                                 <h5>Output</h5>
                                 <div class="console output">
-                                    <span class="error" style="white-space: pre"><?php echo $job['output'] ?></span>
+                                    <span class="error"><?php echo $job['output'] ?></span>
                                 </div>
                             <?php endif; ?>
                         </div>

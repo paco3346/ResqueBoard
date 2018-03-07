@@ -87,7 +87,7 @@
 
 			<?php
 
-			\ResqueBoard\Lib\JobHelper::renderJobs($jobs, 'No jobs found', 'infinite-scroll');
+			\ResqueBoard\Lib\JobHelper::renderJobs($jobs, 'No jobs found');
 			\ResqueBoard\Lib\PageHelper::renderPagination($pagination);
 
 
