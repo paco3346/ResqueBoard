@@ -908,7 +908,7 @@ class ResqueStat
      * @param array $jobs An array of jobs
      *
      * @since 1.0.0
-     * @return An array of jobs
+     * @return array
      */
     private function setJobStatus($jobs)
     {
