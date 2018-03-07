@@ -208,6 +208,7 @@ $app->map(
             $params = cleanArgs($app->request()->params());
 
             $searchData = array_merge($defaults, $params);
+            $searchData['limit'] = intval($searchData['limit']);
             array_walk(
                 $searchData,
                 function (&$key) {
@@ -224,10 +225,7 @@ $app->map(
                 : PAGINATION_LIMIT;
             $pagination->baseUrl = 'jobs/view?';
 
-            $conditions = array();
             $searchToken = '';
-
-            $pagination->totalResult = $resqueStat->getJobs(array_merge($conditions, array('type' => 'count')));
 
             if (isset($params['job_id'])) {
                 $jobId = $searchToken = ltrim($params['job_id'], '#');
@@ -263,6 +261,8 @@ $app->map(
                     $jobs = array();
                 }
 
+                //remove the limit when getting total count
+                $conditions['limit'] = null;
                 $pagination->totalResult = $resqueStat->getJobs(array_merge($conditions, array('type' => 'count')));
             }
 
