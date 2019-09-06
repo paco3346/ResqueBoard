@@ -404,11 +404,11 @@ class ResqueStat
         }
 
         if (!empty($options['date_after'])) {
-            $conditions['t']['$gte'] = new \MongoDate($options['date_after']);
+            $conditions['t']['$gte'] = new \MongoDB\BSON\UTCDateTime($options['date_after'] * 1000);
         }
 
         if (!empty($options['date_before'])) {
-            $conditions['t']['$lte'] = new \MongoDate($options['date_before']);
+            $conditions['t']['$lte'] = new \MongoDB\BSON\UTCDateTime($options['date_before'] * 1000);
         }
 
         $cursorOptions = ['sort' => $options['sort']];
@@ -470,11 +470,11 @@ class ResqueStat
         $conditions = array();
 
         if (!empty($options['date_after'])) {
-            $conditions['t']['$gte'] = new \MongoDate($options['date_after']);
+            $conditions['t']['$gte'] = new \MongoDB\BSON\UTCDateTime($options['date_after'] * 1000);
         }
 
         if (!empty($options['date_before'])) {
-            $conditions['t']['$lt'] = new \MongoDate($options['date_before']);
+            $conditions['t']['$lt'] = new \MongoDB\BSON\UTCDateTime($options['date_before'] * 1000);
         }
 
         $results = array();
@@ -484,21 +484,25 @@ class ResqueStat
 
         $jobsDoneCursor = $jobsDoneCollection->find($conditions, array('t' => true));
         foreach ($jobsDoneCursor as $job) {
-            if (isset($results[$job['t']->sec])) {
-                $results[$job['t']->sec] += 1;
+            $timestamp = $job['t']->__toString() / 1000;
+            if (isset($results[$timestamp])) {
+                $results[$timestamp] += 1;
             } else {
-                $results[$job['t']->sec] = 1;
+                $results[$timestamp] = 1;
             }
         }
 
         $jobsFailCursor = $jobsFailCollection->find($conditions, array('t' => true));
         foreach ($jobsFailCursor as $job) {
-            if (isset($results[$job['t']->sec])) {
-                $results[$job['t']->sec] += 1;
+            $timestamp = $job['t']->__toString() / 1000;
+            if (isset($results[$timestamp])) {
+                $results[$timestamp] += 1;
             } else {
-                $results[$job['t']->sec] = 1;
+                $results[$timestamp] = 1;
             }
         }
+
+        ksort($results);
 
         return $results;
     }
@@ -627,11 +631,11 @@ class ResqueStat
         }
 
         if (!empty($options['date_after'])) {
-            $conditions['t']['$gte'] = new \MongoDate($options['date_after']);
+            $conditions['t']['$gte'] = new \MongoDB\BSON\UTCDateTime($options['date_after'] * 1000);
         }
 
         if (!empty($options['date_before'])) {
-            $conditions['t']['$lt'] = new \MongoDate($options['date_before']);
+            $conditions['t']['$lt'] = new \MongoDB\BSON\UTCDateTime($options['date_before'] * 1000);
         }
 
         $results = array();
@@ -744,44 +748,24 @@ class ResqueStat
 
         $stats = new \stdClass();
 
-        // Computing total jobs distribution stats
-        $map = new \MongoDB\BSON\Javascript("function() {emit(this.d.args.payload.class, 1); }");
-        $reduce = new \MongoDB\BSON\Javascript(
-            "function(key, val) {".
-            "var sum = 0;".
-            "for (var i in val) {".
-            "sum += val[i];".
-            "}".
-            "return sum;".
-            "}"
-        );
-
-        $conditions = array('$lt' => $stopDate);
-        if ($startDate != null) {
-            $conditions['$gte'] = $startDate;
-        }
-        Service::Mongo()->selectDatabase(Service::$settings['Mongo']['database'])->command(
+        $cursor = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->aggregate([
             [
-                'mapreduce' => 'got_events',
-                'map' => $map,
-                'reduce' => $reduce,
-                'query' => ['t' => $conditions],
-                'out' => ['merge' => 'jobs_repartition_stats']
+                '$group' => [
+                    '_id' => ['class'=> '$d.args.payload.class'],
+                    'value' => ['$sum' => 1]
+                ]
             ]
-        );
-
-        $cursor = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'jobs_repartition_stats')->find([], [
-            'sort' => [
-                'value' => -1
-            ],
-            'limit' => intval($limit)
         ]);
 
         $stats->total = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->count();
         $stats->stats = array();
         foreach ($cursor as $c) {
             $c['percentage'] = round($c['value'] / $stats->total * 100, 2);
-            $stats->stats[] = $c;
+            $stats->stats[] = [
+                'percentage' => round($c['value'] / $stats->total * 100, 2),
+                'value' => $c['value'],
+                '_id' => $c['_id']['class']
+            ];
         }
 
         return $stats;
@@ -803,11 +787,11 @@ class ResqueStat
         $filter = array();
 
         if (isset($options['start'])) {
-            $filter['t']['$gte'] = new \MongoDate(strtotime($options['start']));
+            $filter['t']['$gte'] = new \MongoDB\BSON\UTCDateTime($options['start'] * 1000);
         }
 
         if (isset($options['end'])) {
-            $filter['t']['$lt'] = new \MongoDate(strtotime($options['end']));
+            $filter['t']['$lt'] = new \MongoDB\BSON\UTCDateTime($options['end'] * 1000);
         }
 
         $stats = new \stdClass();
@@ -855,14 +839,14 @@ class ResqueStat
         if (in_array('oldest', $options['fields'])) {
             $cursors = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->find([], ['t'], ['sort' => ['t' => 1], 'limit' => 1]);
             foreach ($cursors as $cursor) {
-                $stats->oldest = new \DateTime('@'.$cursor['t']->sec);
+                $stats->oldest = new \DateTime('@'.$cursor['t']->__toString() / 1000);
             }
         }
 
         if (in_array('newest', $options['fields'])) {
             $cursors = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'got_events')->find([], ['t'], ['sort' => ['t' => -1], 'limit' => 1]);
             foreach ($cursors as $cursor) {
-                $stats->newest = new \DateTime('@'.$cursor['t']->sec);
+                $stats->newest = new \DateTime('@'.$cursor['t']->__toString() / 1000);
             }
         }
 
@@ -883,12 +867,12 @@ class ResqueStat
         $jobs = array();
         foreach ($cursor as $doc) {
             $jobs[$doc['d']['args']['payload']['id']] = array(
-                            'time' => isset($doc['t']) ? date('c', $doc['t']->sec) : null,
+                            'time' => isset($doc['t']) ? $doc['t']->toDateTime()->format('c') : null,
                             'queue' => $doc['d']['args']['queue'],
                             'worker' => isset($doc['d']['worker']) ? $doc['d']['worker'] : null,
                             'level' => isset($doc['d']['level']) ? $doc['d']['level'] : null,
                             'class' => $doc['d']['args']['payload']['class'],
-                            'args' => var_export($doc['d']['args']['payload']['args'][0], true),
+                            'args' => json_encode($doc['d']['args']['payload']['args'][0], JSON_PRETTY_PRINT),
                             'job_id' => $doc['d']['args']['payload']['id']
 
             );
@@ -913,8 +897,6 @@ class ResqueStat
     private function setJobStatus($jobs)
     {
         $jobIds = array_keys($jobs);
-
-
 
 
         $jobsCursor = Service::Mongo()->selectCollection(Service::$settings['Mongo']['database'], 'done_events')->find(array('d.job_id' => array('$in' => array_values($jobIds))));

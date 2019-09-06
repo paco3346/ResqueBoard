@@ -78,7 +78,7 @@ class JobHelper
                             <?php
 
                 if (isset($job['log'])) {
-                    echo '<div class="console"><span class="error">' . $job['log'] . '</span></div>';
+                    echo '<div class="console"><span class="error">' . htmlspecialchars($job['log']) . '</span></div>';
                 }
 
                 if (isset($job['trace'])) {

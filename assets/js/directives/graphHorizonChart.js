@@ -14,7 +14,7 @@ angular.module("app").directive("graphHorizonChart", function() {
 
 			var
 				context = cubism.context().size(466),
-				cube = context.cube("http://"+CUBE_URL),
+				cube = context.cube("//"+CUBE_URL),
 				horizon = context.horizon().metric(cube.metric).height(element.parent().parent().height()),
 				metrics = [];
 

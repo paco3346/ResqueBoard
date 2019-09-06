@@ -19,6 +19,7 @@ angular.module("app").controller("lastestJobGraphController", [
 		{second : 84600,	code : "864e5"}
 	);
 
+
 	/**
 	 * Display latest jobs stats
 	 *
@@ -32,7 +33,7 @@ angular.module("app").controller("lastestJobGraphController", [
 		 */
 		var limit = 80;
 
-		d3.json("http://"+CUBE_URL+"/1.0/metric/get"+
+		d3.json("//"+CUBE_URL+"/1.0/metric/get"+
 			"?expression=sum(got)"+
 			"&start="+encodeURIComponent("2012-07-07T16:00:00Z")+
 			"&stop=" + encodeURIComponent(formatISO(stop))+
@@ -215,7 +216,7 @@ angular.module("app").controller("lastestJobGraphController", [
 
 				}
 
-				var metricSocket = new WebSocket("ws://"+CUBE_URL+"/1.0/metric/get");
+				var metricSocket = new WebSocket("wss://"+CUBE_URL+"/1.0/metric/get");
 
 				metricSocket.onopen = function() {
 					var nextDate = getNextTick(data[data.length-1].time);
