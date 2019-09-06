@@ -106,7 +106,7 @@ angular.module("app").controller("loadOverviewController", [
 		var endDate = dom.data("endDate");
 		var dataStep = dom.data("step");
 
-		d3.json("http://"+CUBE_URL+"/1.0/metric/get"+
+		d3.json("//"+CUBE_URL+"/1.0/metric/get"+
 		"?expression=sum(got)" +
 		"&start="+ encodeURIComponent(startDate) +
 		"&stop=" + encodeURIComponent(endDate) +
@@ -162,7 +162,7 @@ angular.module("app").controller("loadOverviewController", [
 			return;
 		}
 
-		d3.json("http://"+CUBE_URL+"/1.0/metric/get"+
+		d3.json("//"+CUBE_URL+"/1.0/metric/get"+
 		"?expression=" + expression +
 		"&start="+ encodeURIComponent(start) +
 		"&stop=" + encodeURIComponent(end) +
@@ -312,8 +312,6 @@ angular.module("app").controller("loadOverviewController", [
 		e.preventDefault();
 
 		var form = $(this).parents("form");
-
-		console.log(form);
 
 		var dateToken = {
 			hour: "0",

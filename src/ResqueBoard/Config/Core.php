@@ -47,16 +47,18 @@ $settings = array(
  */
 ResqueBoard\Lib\Service\Service::$settings = array(
     'Redis' => array(
-        'host' => '127.0.0.1',
+        'host' => getenv('REDIS_HOST'),
         'port' => 6379,
         'database' => 0,
         'password' => '',
         'prefix' => 'resque'
     ),
     'Mongo' => array(
-        'host' => 'localhost',
+        'host' => getenv('MONGO_HOST') ?: 'localhost',
         'port' => 27017,
-        'database' => 'cube_development'
+        'database' => getenv('MONGO_DATABASE'),
+        'username' => getenv('MONGO_USERNAME'),
+        'password' => getenv('MONGO_PASSWORD')
     ),
     'Cube' => array(
         'host' => '127.0.0.1',

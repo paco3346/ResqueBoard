@@ -3,6 +3,8 @@ angular.module("app").controller("jobViewController", [
     function() {
         function init()
         {
+            var timestamps = [];
+
             var socket = new WebSocket("ws://"+CUBE_URL+"/1.0/event/get");
 
             socket.onopen = function() {
@@ -18,7 +20,10 @@ angular.module("app").controller("jobViewController", [
         }
 
         function updateJobOutput(event) {
-            $("#" + event.data.job_id  +" .output span").html(event.data.output);
+            if (timestamps[event.data.job_id] == undefined || timestamps[event.data.job_id] < Date.now()) {
+              timestamps[event.data.job_id] = Date.now();
+              $("#" + event.data.job_id + " .output span").html(event.data.output);
+            }
         }
 
         init();

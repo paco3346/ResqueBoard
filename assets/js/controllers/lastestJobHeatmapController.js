@@ -10,7 +10,7 @@ angular.module("app").controller("lastestJobHeatmapController", [
 
 	var cal = new CalHeatMap();
 	var range = 6; // Number of hours to display
-	var start = new Date().setHours(new Date().getHours() - (range - 1));
+	var start = new Date().setUTCHours(new Date().getUTCHours() - (range - 1));
 	var CAL_RANGE = 1000 * 60 * 60 * range; // Number of milliseconds between the start and the end of the calendar
 
 	cal.init({
@@ -34,12 +34,7 @@ angular.module("app").controller("lastestJobHeatmapController", [
 			$http({method: "GET", url: "api/jobs/" + (+start)/1000 + "/" + ((+start)/1000+60)}).
 				success(function(data) {
 					$scope.jobs = [];
-					for (var timestamp in data) {
-						for (var job in data[timestamp]) {
-							data[timestamp][job].created = new Date(data[timestamp][job].s_time*1000);
-						}
-						$scope.jobs = data;
-					}
+				  $scope.jobs = data;
 					$scope.loading = false;
 				}).
 				error(function() {

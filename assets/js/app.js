@@ -37,7 +37,7 @@ $(".infinite-scroll").infinitescroll({
     itemSelector : ".infinite-scroll li",
     loading: {
         finishedMsg: "No more pages to load.",
-        img: "http://www.infinite-scroll.com/loading.gif"
+        img: "//www.infinite-scroll.com/loading.gif"
     },
     bufferPx: 5000
 });
