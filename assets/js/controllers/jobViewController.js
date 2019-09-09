@@ -5,7 +5,7 @@ angular.module("app").controller("jobViewController", [
         {
             var timestamps = [];
 
-            var socket = new WebSocket("ws://"+CUBE_URL+"/1.0/event/get");
+            var socket = new WebSocket("wss://"+CUBE_URL+"/1.0/event/get");
 
             socket.onopen = function() {
                 socket.send(JSON.stringify({
